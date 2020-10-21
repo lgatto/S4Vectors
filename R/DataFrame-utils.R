@@ -79,38 +79,53 @@ setMethod("merge", c("DataFrame", "data.frame"), function(x, y, ...) {
 ## TODOs:
 ##
 ## 1. [DONE] by can't handle `List` columns
-## 2. bx and bz should consider names and classes of the by columns.
+## 2. [DONE] bx and bz should consider names and classes of the by columns.
 ##
 ## see https://github.com/Bioconductor/S4Vectors/issues/73
 ##
-## ## Simple case, by are vectors - WORKS
+## ## Simple case: by are vectors - WORKS
 ## d1 <- DataFrame(a = 1:3, x = letters[1:3], y = List(1, 1:2, 1:3))
 ## d2 <- DataFrame(a = 1:3, x = letters[1:3], z = List(1:3, 1:2, 1))
 ##
 ## S4Vectors::mergeDFrame(d1, d2)
 ## S4Vectors::mergeDFrame(d1, d2, by = "a", suffixes = c("_x", "_y"))
 ##
-## ## Simple case, by vector and Lists of same type - WORKS
+## ## Simple case: by vector and Lists of same type - WORKS
 ## d1 <- DataFrame(a = 1:3, x = List(letters[1:3]), y = List(1, 1:2, 1:3))
 ## d2 <- DataFrame(a = 1:3, x = List(letters[1:3]), z = List(1:3, 1:2, 1))
 ##
 ## S4Vectors::mergeDFrame(d1, d2)
+## S4Vectors::mergeDFrame(d2, d1)
 ## S4Vectors::mergeDFrame(d1, d2, by = "a", suffixes = c("_x", "_y"))
 ##
-## ## Lists and lists - this should probably fail!!
+## ## Simple case: no shared cols or setting by.x and by.y
+## d1 <- DataFrame(a1 = 1:3, x1 = List(letters[1:3]), y = List(1, 1:2, 1:3))
+## d2 <- DataFrame(a2 = 1:3, x2 = List(letters[1:3]), z = List(1:3, 1:2, 1))
+##
+## S4Vectors::mergeDFrame(d1, d2)
+## S4Vectors::mergeDFrame(d1, d2, by.x = "a1", by.y = "a2")
+## S4Vectors::mergeDFrame(d1, d2, by.x = c("a1", "x1"), by.y = c("a2", "x2"))
+##
+## ## Lists and lists - throws an error
 ## d1 <- DataFrame(a = 1:3, x = List(letters[1:3]), y = List(1, 1:2, 1:3))
 ## d2 <- DataFrame(a = 1:3, x = List(letters[1:3]), z = List(1:3, 1:2, 1))
 ## d2$x <- rep(list(letters[1:3]), 3)
 ##
-## S4Vectors::mergeDFrame(d1, d2) ## x CharacterList
-## S4Vectors::mergeDFrame(d2, d1) ## x is list
+## S4Vectors::mergeDFrame(d1, d2) ## error
 ##
-## ## Lists of different types - this should fail too!!
+## ## Lists of different types - throws an error
 ## d1 <- DataFrame(a = 1:3, x = List(as.character(1:3)), y = List(1, 1:2, 1:3))
 ## d2 <- DataFrame(a = 1:3, x = List(1:3), z = List(1:3, 1:2, 1))
 ##
-## S4Vectors::mergeDFrame(d1, d2) ## x is CharacterList
-## S4Vectors::mergeDFrame(d2, d1) ## x is IntegerList
+## S4Vectors::mergeDFrame(d1, d2) ## error
+## S4Vectors::mergeDFrame(d1, d2, by = "a")
+##
+## ## Different for vector columns - throws error
+## d1 <- DataFrame(a = 1:3, x = letters[1:3], y = List(1, 1:2, 1:3))
+## d2 <- DataFrame(a = as.character(1:3), x = letters[1:3], z = List(1:3, 1:2, 1))
+##
+## S4Vectors::mergeDFrame(d1, d2) ## error
+## S4Vectors::mergeDFrame(d2, d1) ## error
 mergeDFrame <- function (x, y,
                          by = intersect(names(x), names(y)),
                          by.x = by, 
@@ -131,7 +146,7 @@ mergeDFrame <- function (x, y,
         if (is.character(by)) {
             poss <- c("row.names", names(df))
             ## names(df) are not necessarily unique, so check for multiple matches.
-            if(any(bad <- !charmatch(by, poss, 0L)))
+            if (any(bad <- !charmatch(by, poss, 0L)))
                 stop(ngettext(sum(bad),
                               "'by' must specify a uniquely valid column",
                               "'by' must specify uniquely valid columns"),
@@ -163,7 +178,7 @@ mergeDFrame <- function (x, y,
         nm <- nm.x <- names(x)
         nm.y <- names(y)
         has.common.nms <- any(cnm <- nm.x %in% nm.y)
-        if(has.common.nms) {
+        if (has.common.nms) {
             names(x)[cnm] <- paste0(nm.x[cnm], suffixes[1L])
             cnm <- nm.y %in% nm
             names(y)[cnm] <- paste0(nm.y[cnm], suffixes[2L])
@@ -198,6 +213,12 @@ mergeDFrame <- function (x, y,
             ## Use same set of names.
             bx <- x[, by.x, drop=FALSE]; by <- y[, by.y, drop=FALSE]
             names(bx) <- names(by) <- paste0("V", seq_len(ncol(bx)))
+            ## Check that bx and by columns are of same class
+            cl.bx <- vapply(bx, class, character(1))
+            cl.by <- vapply(by, class, character(1))
+            if (!all(cl.bx == cl.by))
+                stop("The marching columns in 'x' and 'y' used for merging must ",
+                     "be of identical classes.")
             ## Convert list|List columns to chars for subsequent matching
             bx_list_cols <- vapply(bx, function(.x) is.list(.x) | inherits(.x, "List"), TRUE)
             if (any(bx_list_cols))
@@ -206,7 +227,8 @@ mergeDFrame <- function (x, y,
             by_list_cols <- vapply(by, function(.x) is.list(.x) | inherits(.x, "List"), TRUE)
             if (any(by_list_cols))
                 for (i in which(by_list_cols)) 
-                    by[[i]] <- sapply(by[[i]], paste, collapse = " ")            
+                    by[[i]] <- sapply(by[[i]], paste, collapse = " ")
+
             bz <- do.call("paste", c(rbind(bx, by), sep = "\r"))
             bx <- bz[seq_len(nx)]
             by <- bz[nx + seq_len(ny)]
