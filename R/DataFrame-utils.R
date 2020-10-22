@@ -303,11 +303,9 @@ mergeDFrame <- function (x, y,
         if (sort)
 	    res <- res[if(all.x || all.y) {
 			   x <- x[, seq_len(l.b), drop = FALSE]
-			   attributes(x) <- NULL
 			   do.call("order", x)
 		       } else sort.list(bx[m$xi]),, drop = FALSE]
     }
-    attr(res, "row.names") <- .set_row_names(nrow(res))
     res
 }
     
