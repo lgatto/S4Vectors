@@ -75,57 +75,97 @@ setMethod("merge", c("DataFrame", "data.frame"), function(x, y, ...) {
   as(merge(as(x, "data.frame"), y, ...), class(x))
 })
 
+
 ##########################################
 ## TODOs:
 ##
 ## 1. [DONE] by can't handle `List` columns
 ## 2. [DONE] bx and bz should consider names and classes of the by columns.
+## 3. Consider non-string based matching.
 ##
 ## see https://github.com/Bioconductor/S4Vectors/issues/73
-##
+
 ## ## Simple case: by are vectors - WORKS
 ## d1 <- DataFrame(a = 1:3, x = letters[1:3], y = List(1, 1:2, 1:3))
 ## d2 <- DataFrame(a = 1:3, x = letters[1:3], z = List(1:3, 1:2, 1))
-##
-## S4Vectors::mergeDFrame(d1, d2)
-## S4Vectors::mergeDFrame(d1, d2, by = "a", suffixes = c("_x", "_y"))
-##
+
+## mergeDFrame(d1, d2)
+## mergeDFrame(d1, d2, by = "a", suffixes = c("_x", "_y"))
+## mergeDFrame(d1, d2, by = NULL)
+
+
+## ## Testing wrong by argument
+## try(mergeDFrame(d1, d2, by = "foo"))
+## try(mergeDFrame(d1, d2, by.x = "foo"))
+## try(mergeDFrame(d1, d2, by.y = "foo"))
+
+## try(mergeDFrame(d1, d2, by = c("foo", "bar")))
+## try(mergeDFrame(d1, d2, by.x = c("foo", "bar")))
+## try(mergeDFrame(d1, d2, by.y = c("foo", "bar")))
+
+## try(mergeDFrame(d1, d2, by = c("foo", "a")))
+## try(mergeDFrame(d1, d2, by.x = c("foo", "a")))
+## try(mergeDFrame(d1, d2, by.y = c("foo", "a")))
+
+## try(mergeDFrame(d1, d2, by = -1))
+## try(mergeDFrame(d1, d2, by = 0))
+## try(mergeDFrame(d1, d2, by = 10))
+## try(mergeDFrame(d1, d2, by = c(1, 5)))
+
+## try(mergeDFrame(d1, d2, by.x = 1, by.y = 5))
+
+## try(mergeDFrame(d1, d2, by = NA))
+
+## mergeDFrame(d1, d2, by = c(TRUE, FALSE, FALSE))
+## try(mergeDFrame(d1, d2, by = c(TRUE, FALSE, FALSE, TRUE)))
+
+## try(mergeDFrame(d1, d2, by = list(1)))
+## try(mergeDFrame(d1, d2, by = 1i))
+
 ## ## Simple case: by vector and Lists of same type - WORKS
 ## d1 <- DataFrame(a = 1:3, x = List(letters[1:3]), y = List(1, 1:2, 1:3))
 ## d2 <- DataFrame(a = 1:3, x = List(letters[1:3]), z = List(1:3, 1:2, 1))
-##
-## S4Vectors::mergeDFrame(d1, d2)
-## S4Vectors::mergeDFrame(d2, d1)
-## S4Vectors::mergeDFrame(d1, d2, by = "a", suffixes = c("_x", "_y"))
-##
+
+## mergeDFrame(d1, d2)
+## mergeDFrame(d2, d1)
+## mergeDFrame(d1, d2, by = "a", suffixes = c("_x", "_y"))
+
 ## ## Simple case: no shared cols or setting by.x and by.y
 ## d1 <- DataFrame(a1 = 1:3, x1 = List(letters[1:3]), y = List(1, 1:2, 1:3))
 ## d2 <- DataFrame(a2 = 1:3, x2 = List(letters[1:3]), z = List(1:3, 1:2, 1))
-##
-## S4Vectors::mergeDFrame(d1, d2)
-## S4Vectors::mergeDFrame(d1, d2, by.x = "a1", by.y = "a2")
-## S4Vectors::mergeDFrame(d1, d2, by.x = c("a1", "x1"), by.y = c("a2", "x2"))
-##
+
+## mergeDFrame(d1, d2)
+## mergeDFrame(d1, d2, by.x = "a1", by.y = "a2")
+## mergeDFrame(d1, d2, by.x = c("a1", "x1"), by.y = c("a2", "x2"))
+
 ## ## Lists and lists - throws an error
 ## d1 <- DataFrame(a = 1:3, x = List(letters[1:3]), y = List(1, 1:2, 1:3))
 ## d2 <- DataFrame(a = 1:3, x = List(letters[1:3]), z = List(1:3, 1:2, 1))
 ## d2$x <- rep(list(letters[1:3]), 3)
-##
-## S4Vectors::mergeDFrame(d1, d2) ## error
-##
+
+## try(mergeDFrame(d1, d2)) ## error
+
 ## ## Lists of different types - throws an error
 ## d1 <- DataFrame(a = 1:3, x = List(as.character(1:3)), y = List(1, 1:2, 1:3))
 ## d2 <- DataFrame(a = 1:3, x = List(1:3), z = List(1:3, 1:2, 1))
-##
-## S4Vectors::mergeDFrame(d1, d2) ## error
-## S4Vectors::mergeDFrame(d1, d2, by = "a")
-##
+
+## try(mergeDFrame(d1, d2)) ## error
+## mergeDFrame(d1, d2, by = "a")
+
 ## ## Different for vector columns - throws error
 ## d1 <- DataFrame(a = 1:3, x = letters[1:3], y = List(1, 1:2, 1:3))
 ## d2 <- DataFrame(a = as.character(1:3), x = letters[1:3], z = List(1:3, 1:2, 1))
-##
-## S4Vectors::mergeDFrame(d1, d2) ## error
-## S4Vectors::mergeDFrame(d2, d1) ## error
+
+## try(mergeDFrame(d1, d2)) ## error
+## try(mergeDFrame(d2, d1)) ## error
+
+## ## Simple case with all = TRUE
+## d1 <- DataFrame(a = letters[1:3], b = letters[1:3])
+## d2 <- DataFrame(a = letters[2:4], b = letters[2:4])
+
+## mergeDFrame(d1, d2, all = TRUE)
+## mergeDFrame(d1, d2, by = NULL)
+
 mergeDFrame <- function (x, y,
                          by = intersect(names(x), names(y)),
                          by.x = by, 
@@ -308,6 +348,7 @@ mergeDFrame <- function (x, y,
     }
     res
 }
+
     
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
